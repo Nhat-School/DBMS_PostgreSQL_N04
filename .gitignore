@@ -1,0 +1,10 @@
+node_modules/
+.DS_Store
+*.log
+backend/backend_log.txt
+frontend/frontend_log.txt
+backend/.env
+dist/
+.env
+.parcel-cache
+.cache
