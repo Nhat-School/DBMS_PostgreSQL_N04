@@ -1,0 +1,9 @@
+[dotenv@17.3.1] injecting env (6) from .env -- tip: ⚙️  override existing env vars with { override: true }
+Server running on port 5001
+Successfully connected to PostgreSQL database
+Networks table not found, returning empty GeoJSON
+Networks table not found, returning empty GeoJSON
+Networks table not found, returning empty GeoJSON
+Networks table not found, returning empty GeoJSON
+Networks table not found, returning empty GeoJSON
+Networks table not found, returning empty GeoJSON
