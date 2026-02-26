@@ -1,13 +1,32 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, GeoJSON, LayersControl, LayerGroup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import axios from 'axios';
 import './App.css';
 
-const API_BASE_URL = 'http://localhost:5001/api';
+const API_BASE_URL = '/api';
 
-// Helper component to update map view
+// Helper component to fit map to GeoJSON data bounds
+function FitBounds({ data }) {
+  const map = useMap();
+  useEffect(() => {
+    if (data) {
+      try {
+        const geoJsonLayer = L.geoJSON(data);
+        const bounds = geoJsonLayer.getBounds();
+        if (bounds.isValid()) {
+          map.fitBounds(bounds, { padding: [30, 30], animate: true });
+        }
+      } catch (e) {
+        console.warn('Could not fit bounds:', e);
+      }
+    }
+  }, [data, map]);
+  return null;
+}
+
+// Helper component to update map view (for search)
 function MapUpdater({ center, zoom }) {
   const map = useMap();
   useEffect(() => {
@@ -19,6 +38,7 @@ function MapUpdater({ center, zoom }) {
 }
 
 function App() {
+  const [bounds, setBounds] = useState(null);
   const [networks, setNetworks] = useState(null);
   const [garbage, setGarbage] = useState(null);
   const [buildings, setBuildings] = useState(null);
@@ -26,21 +46,30 @@ function App() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
-  const [mapView, setMapView] = useState({ center: [10.762622, 106.660172], zoom: 13 });
+  const [mapView, setMapView] = useState(null);
+  const [fitData, setFitData] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [netRes, garRes, bldRes, rdRes] = await Promise.all([
+        const [bndRes, netRes, garRes, bldRes, rdRes] = await Promise.all([
+          axios.get(`${API_BASE_URL}/bounds`),
           axios.get(`${API_BASE_URL}/networks`),
           axios.get(`${API_BASE_URL}/garbage`),
           axios.get(`${API_BASE_URL}/buildings`),
           axios.get(`${API_BASE_URL}/roads`),
         ]);
+        setBounds(bndRes.data);
         setNetworks(netRes.data);
         setGarbage(garRes.data);
         setBuildings(bldRes.data);
         setRoads(rdRes.data);
+
+        // Auto-fit to bounds layer (or any available data)
+        const dataToFit = bndRes.data || netRes.data || garRes.data || bldRes.data || rdRes.data;
+        if (dataToFit && dataToFit.features && dataToFit.features.length > 0) {
+          setFitData(dataToFit);
+        }
       } catch (err) {
         console.error('Error fetching spatial data:', err);
       }
@@ -69,9 +98,10 @@ function App() {
   const onEachFeature = (feature, layer) => {
     if (feature.properties) {
       const popupContent = Object.entries(feature.properties)
+        .filter(([key]) => key !== 'gid')
         .map(([key, value]) => `<strong>${key}:</strong> ${value}`)
         .join('<br/>');
-      layer.bindPopup(popupContent);
+      if (popupContent) layer.bindPopup(popupContent);
     }
   };
 
@@ -120,37 +150,44 @@ function App() {
         </aside>
 
         <div className="map-wrapper">
-          <MapContainer center={mapView.center} zoom={mapView.zoom} scrollWheelZoom={true}>
-            <MapUpdater center={mapView.center} zoom={mapView.zoom} />
+          <MapContainer center={[18.2, 108.72]} zoom={14} scrollWheelZoom={true}>
+            {fitData && <FitBounds data={fitData} />}
+            {mapView && <MapUpdater center={mapView.center} zoom={mapView.zoom} />}
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
 
             <LayersControl position="topright">
+              <LayersControl.Overlay checked name="Bounds">
+                <LayerGroup>
+                  {bounds && <GeoJSON key="bnd" data={bounds} style={{ color: '#9c27b0', weight: 2, fillOpacity: 0.05, dashArray: '5,5' }} onEachFeature={onEachFeature} />}
+                </LayerGroup>
+              </LayersControl.Overlay>
+
               <LayersControl.Overlay checked name="Canal Networks">
                 <LayerGroup>
-                  {networks && <GeoJSON data={networks} style={{ color: '#2196f3' }} onEachFeature={onEachFeature} />}
+                  {networks && <GeoJSON key="net" data={networks} style={{ color: '#2196f3', weight: 2 }} onEachFeature={onEachFeature} />}
                 </LayerGroup>
               </LayersControl.Overlay>
 
               <LayersControl.Overlay checked name="Garbage Sites">
                 <LayerGroup>
-                  {garbage && <GeoJSON data={garbage} pointToLayer={(feature, latlng) => {
+                  {garbage && <GeoJSON key="gar" data={garbage} pointToLayer={(feature, latlng) => {
                     return L.circleMarker(latlng, { radius: 8, fillColor: '#f44336', color: '#000', weight: 1, opacity: 1, fillOpacity: 0.8 });
                   }} onEachFeature={onEachFeature} />}
                 </LayerGroup>
               </LayersControl.Overlay>
 
-              <LayersControl.Overlay name="Buildings">
+              <LayersControl.Overlay checked name="Buildings">
                 <LayerGroup>
-                  {buildings && <GeoJSON data={buildings} style={{ color: '#4caf50', weight: 1 }} onEachFeature={onEachFeature} />}
+                  {buildings && <GeoJSON key="bld" data={buildings} style={{ color: '#4caf50', weight: 1, fillOpacity: 0.3 }} onEachFeature={onEachFeature} />}
                 </LayerGroup>
               </LayersControl.Overlay>
 
-              <LayersControl.Overlay name="Roads">
+              <LayersControl.Overlay checked name="Roads">
                 <LayerGroup>
-                  {roads && <GeoJSON data={roads} style={{ color: '#ff9800', weight: 2 }} onEachFeature={onEachFeature} />}
+                  {roads && <GeoJSON key="rds" data={roads} style={{ color: '#ff9800', weight: 2 }} onEachFeature={onEachFeature} />}
                 </LayerGroup>
               </LayersControl.Overlay>
             </LayersControl>

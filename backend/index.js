@@ -33,6 +33,8 @@ app.get('/api/health', (req, res) => {
 });
 
 // Helper function to fetch GeoJSON
+// Note: We use ST_Transform(ST_SetSRID(geom, 32648), 4326) because the input data 
+// is in UTM/VN2000 coordinates (in the millions) but was imported without a PRJ.
 const fetchGeoJSON = async (tableName) => {
   const query = `
     SELECT jsonb_build_object(
@@ -43,7 +45,7 @@ const fetchGeoJSON = async (tableName) => {
       SELECT jsonb_build_object(
         'type',       'Feature',
         'id',         gid,
-        'geometry',   ST_AsGeoJSON(geom)::jsonb,
+        'geometry',   ST_AsGeoJSON(ST_Transform(ST_SetSRID(geom, 32648), 4326))::jsonb,
         'properties', to_jsonb(inputs) - 'geom'
       ) AS feature
       FROM (SELECT * FROM ${tableName}) inputs
@@ -91,6 +93,16 @@ app.get('/api/roads', async (req, res) => {
   } catch (err) {
     console.error('Roads fetch error:', err);
     res.status(500).json({ error: 'Failed to fetch roads' });
+  }
+});
+
+app.get('/api/bounds', async (req, res) => {
+  try {
+    const data = await fetchGeoJSON('bounds');
+    res.json(data);
+  } catch (err) {
+    console.error('Bounds fetch error:', err);
+    res.status(500).json({ error: 'Failed to fetch bounds' });
   }
 });
 
