@@ -65,7 +65,8 @@ function App() {
         setBuildings(bldRes.data);
         setRoads(rdRes.data);
 
-        // Auto-fit to bounds layer (or any available data)
+        // Auto-fit to bounds layer (or any available data) on load 
+        // to ensure localized data is visible even if the default zoom is too high.
         const dataToFit = bndRes.data || netRes.data || garRes.data || bldRes.data || rdRes.data;
         if (dataToFit && dataToFit.features && dataToFit.features.length > 0) {
           setFitData(dataToFit);
@@ -150,7 +151,7 @@ function App() {
         </aside>
 
         <div className="map-wrapper">
-          <MapContainer center={[18.2, 108.72]} zoom={14} scrollWheelZoom={true}>
+          <MapContainer center={[16.0, 108.0]} zoom={6} scrollWheelZoom={true}>
             {fitData && <FitBounds data={fitData} />}
             {mapView && <MapUpdater center={mapView.center} zoom={mapView.zoom} />}
             <TileLayer

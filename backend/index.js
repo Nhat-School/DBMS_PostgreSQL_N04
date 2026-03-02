@@ -45,7 +45,7 @@ const fetchGeoJSON = async (tableName) => {
       SELECT jsonb_build_object(
         'type',       'Feature',
         'id',         gid,
-        'geometry',   ST_AsGeoJSON(ST_Transform(ST_SetSRID(geom, 32648), 4326))::jsonb,
+        'geometry',   ST_AsGeoJSON(ST_Transform(ST_SetSRID(geom, 3405), 4326))::jsonb,
         'properties', to_jsonb(inputs) - 'geom'
       ) AS feature
       FROM (SELECT * FROM ${tableName}) inputs
@@ -61,8 +61,8 @@ app.get('/api/networks', async (req, res) => {
     const data = await fetchGeoJSON('networks');
     res.json(data);
   } catch (err) {
-    console.warn('Networks table not found, returning empty GeoJSON');
-    res.json({ type: 'FeatureCollection', features: [] });
+    console.error('Networks fetch error:', err);
+    res.status(500).json({ error: 'Failed to fetch networks' });
   }
 });
 
